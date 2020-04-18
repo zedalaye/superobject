@@ -1225,9 +1225,6 @@ label
   redo;
 begin
   Result := 0;
-  ret := 0;
-  rem := 0;
-  min := 0;
 
   if unused <> nil then
     unused^ := 0;
