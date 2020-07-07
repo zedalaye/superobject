@@ -832,7 +832,7 @@ type
     irError         // other error
   );
 
-function TrySOInvoke(var ctx: TSuperRttiContext; const obj: TValue; const method: string; const params: ISuperObject; var Return: ISuperObject): TSuperInvokeResult; overload;
+function TrySOInvoke(ctx: TSuperRttiContext; const obj: TValue; const method: string; const params: ISuperObject; var Return: ISuperObject): TSuperInvokeResult; overload;
 function SOInvoke(const obj: TValue; const method: string; const params: ISuperObject; ctx: TSuperRttiContext = nil): ISuperObject; overload;
 function SOInvoke(const obj: TValue; const method: string; const params: string; ctx: TSuperRttiContext = nil): ISuperObject; overload;
 {$ENDIF}
@@ -1564,7 +1564,7 @@ begin
   Result := SOInvoke(obj, method, so(params), ctx)
 end;
 
-function TrySOInvoke(var ctx: TSuperRttiContext; const obj: TValue;
+function TrySOInvoke(ctx: TSuperRttiContext; const obj: TValue;
   const method: string; const params: ISuperObject;
   var Return: ISuperObject): TSuperInvokeResult;
 var
