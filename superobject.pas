@@ -3009,19 +3009,21 @@ redo_char:
           if (tok.is_double = 0) then
           begin
             val(tok.pb.FBuf, numi, code);
-            if ObjectIsType(this, stArray) then
-            begin
-              if (foPutValue in options) and (evalstack = 0) then
+            if code = 0 then
+              if ObjectIsType(this, stArray) then
               begin
-                this.AsArray.PutO(numi, put);
-                TokRec^.current := put;
+                if (foPutValue in options) and (evalstack = 0) then
+                begin
+                  this.AsArray.PutO(numi, put);
+                  TokRec^.current := put;
+                end else
+                if (foDelete in options) and (evalstack = 0) then
+                  TokRec^.current := this.AsArray.Delete(numi) else
+                  TokRec^.current := this.AsArray.GetO(numi);
               end else
-              if (foDelete in options) and (evalstack = 0) then
-                TokRec^.current := this.AsArray.Delete(numi) else
-                TokRec^.current := this.AsArray.GetO(numi);
-            end else
-              TokRec^.current := TSuperObject.Create(numi);
-
+                TokRec^.current := TSuperObject.Create(numi)
+            else
+              TokRec^.current := TSuperObject.Create(tok.pb.FBuf);
           end else
           if (tok.is_double <> 0) then
           begin
@@ -3046,7 +3048,10 @@ redo_char:
             end else
             begin
               val(tok.pb.FBuf, numd, code);
-              TokRec^.current := TSuperObject.Create(numd);
+              if code = 0 then
+                TokRec^.current := TSuperObject.Create(numd)
+              else
+                TokRec^.current := TSuperObject.Create(tok.pb.FBuf);
             end;
           end else
           begin
