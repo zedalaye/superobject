@@ -452,6 +452,8 @@ type
     quote_char: SOChar;
     stack: array[0..SUPER_TOKENER_MAX_DEPTH-1] of TSuperTokenerSrec;
     line, col: Integer;
+    (* utf8 *)
+    Utf8State, Utf8CodePoint: Cardinal;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -683,7 +685,7 @@ type
        const put: ISuperObject = nil; dt: TSuperType = stNull): ISuperObject;
     class function ParseFile(const FileName: string; strict: Boolean; partial: boolean = true; const this: ISuperObject = nil; options: TSuperFindOptions = [];
        const put: ISuperObject = nil; dt: TSuperType = stNull): ISuperObject;
-    class function ParseEx(tok: TSuperTokenizer; str: PSOChar; len: integer; strict: Boolean; const this: ISuperObject = nil;
+    class function ParseEx(tok: TSuperTokenizer; buf: PByte; len: integer; char_size: Byte; strict: Boolean; const this: ISuperObject = nil;
       options: TSuperFindOptions = []; const put: ISuperObject = nil; dt: TSuperType = stNull): ISuperObject;
 
     // constructors / destructor
@@ -851,6 +853,54 @@ uses
 var
   debugcount: integer = 0;
 {$ENDIF}
+
+(* Inline Utf8 Decoder *)
+
+// Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
+
+const
+  UTF8_ACCEPT = 0;
+  UTF8_REJECT = 12;
+
+const
+  UTF8D: array[0..363] of Byte = (
+    // The first part of the table maps bytes to character classes that
+    // to reduce the size of the transition table and create bitmasks.
+     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,  9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+     7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
+     8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+    10,3,3,3,3,3,3,3,3,3,3,3,3,4,3,3, 11,6,6,6,5,8,8,8,8,8,8,8,8,8,8,8,
+
+    // The second part is a transition table that maps a combination
+    // of a state of the automaton and a character class to a state.
+     0,12,24,36,60,96,84,12,12,12,48,72, 12,12,12,12,12,12,12,12,12,12,12,12,
+    12, 0,12,12,12,12,12, 0,12, 0,12,12, 12,24,12,12,12,12,12,24,12,24,12,12,
+    12,12,12,12,12,12,12,24,12,12,12,12, 12,24,12,12,12,12,12,12,12,24,12,12,
+    12,12,12,12,12,12,12,36,12,36,12,12, 12,36,12,12,12,12,12,36,12,36,12,12,
+    12,36,12,12,12,12,12,12,12,12,12,12
+  );
+
+function StreamDecodeUtf8(var State: Cardinal; var CodePoint: UCS4Char; Byte: Cardinal): Cardinal; inline;
+var
+  &type: Cardinal;
+begin
+  &type := UTF8D[Byte];                              // uint32_t type = utf8d[byte];
+
+  if State <> UTF8_ACCEPT then                       //  *codep = (*state != UTF8_ACCEPT) ?
+    CodePoint := (Byte and $3f) or (CodePoint shl 6) //    (byte & 0x3fu) | (*codep << 6) :
+  else                                               //    (0xff >> type) & (byte);
+    CodePoint := ($ff shr &type) and Byte;
+
+  State := UTF8D[256 + State + &type];               //  *state = utf8d[256 + *state + type];
+  Result := State                                    //  return *state;
+end;
+
+(* Inline Utf8 Decoder *)
 
 const
   super_number_chars_set = ['0'..'9','.','+','-','e','E'];
@@ -2189,7 +2239,7 @@ var
   obj: ISuperObject;
 begin
   tok := TSuperTokenizer.Create;
-  obj := ParseEx(tok, s, -1, strict, this, options, put, dt);
+  obj := ParseEx(tok, PByte(s), -1, SizeOf(SOChar), strict, this, options, put, dt);
   if(tok.err <> teSuccess) or (not partial and (s[tok.char_offset] <> #0)) then
     Result := nil else
     Result := obj;
@@ -2198,7 +2248,7 @@ end;
 
 class function TSuperObject.ParseStream(stream: TStream; strict: Boolean;
   partial: boolean; const this: ISuperObject; options: TSuperFindOptions;
-   const put: ISuperObject; dt: TSuperType): ISuperObject;
+  const put: ISuperObject; dt: TSuperType): ISuperObject;
 const
   BUFFER_SIZE = 1024;
 var
@@ -2207,42 +2257,49 @@ var
   bufferw: array[0..BUFFER_SIZE-1] of SOChar;
   bom: array[0..1] of byte;
   unicode: boolean;
-  j, size: Integer;
+  size: Integer;
   st: string;
 begin
   st := '';
   tok := TSuperTokenizer.Create;
-
-  if (stream.Read(bom, sizeof(bom)) = 2) and (bom[0] = $FF) and (bom[1] = $FE) then
-  begin
-    unicode := true;
-    size := stream.Read(bufferw, BUFFER_SIZE * SizeOf(SoChar)) div SizeOf(SoChar);
-  end else
+  try
+    if (stream.Read(bom, sizeof(bom)) = 2) and (bom[0] = $FF) and (bom[1] = $FE) then
     begin
-      unicode := false;
+      unicode := True;
+      size := stream.Read(bufferw, BUFFER_SIZE * SizeOf(SOChar)) div SizeOf(SOChar);
+    end
+    else
+    begin
       stream.Seek(0, soFromBeginning);
+      unicode := False;
       size := stream.Read(buffera, BUFFER_SIZE);
     end;
 
-  while size > 0 do
-  begin
-    if not unicode then
-      for j := 0 to size - 1 do
-        bufferw[j] := SOChar(buffera[j]);
-    ParseEx(tok, bufferw, size, strict, this, options, put, dt);
+    while size > 0 do
+    begin
+      if unicode then
+        ParseEx(tok, @bufferw[0], size, SizeOf(SOChar), strict, this, options, put, dt)
+      else
+        ParseEx(tok, @buffera[0], size, SizeOf(AnsiChar), strict, this, options, put, dt);
 
-    if tok.err = teContinue then
+      if tok.err = teContinue then
       begin
-        if not unicode then
-          size := stream.Read(buffera, BUFFER_SIZE) else
-          size := stream.Read(bufferw, BUFFER_SIZE * SizeOf(SoChar)) div SizeOf(SoChar);
-      end else
-      Break;
+        if unicode then
+          size := stream.Read(bufferw, BUFFER_SIZE * SizeOf(SOChar)) div SizeOf(SOChar)
+        else
+          size := stream.Read(buffera, BUFFER_SIZE);
+      end
+      else
+        Break;
+    end;
+
+    if (tok.err <> teSuccess) or (not partial and (st[tok.char_offset] <> #0)) then
+      Result := nil
+    else
+      Result := tok.stack[tok.depth].current;
+  finally
+    tok.Free;
   end;
-  if(tok.err <> teSuccess) or (not partial and (st[tok.char_offset] <> #0)) then
-    Result := nil else
-    Result := tok.stack[tok.depth].current;
-  tok.Free;
 end;
 
 class function TSuperObject.ParseFile(const FileName: string; strict: Boolean;
@@ -2259,8 +2316,10 @@ begin
   end;
 end;
 
-class function TSuperObject.ParseEx(tok: TSuperTokenizer; str: PSOChar; len: integer;
-  strict: Boolean; const this: ISuperObject; options: TSuperFindOptions; const put: ISuperObject; dt: TSuperType): ISuperObject;
+class function TSuperObject.ParseEx(tok: TSuperTokenizer;
+  buf: PByte; len: integer; char_size: Byte;
+  strict: Boolean; const this: ISuperObject; options: TSuperFindOptions;
+  const put: ISuperObject; dt: TSuperType): ISuperObject;
 
 const
   spaces = [#32,#8,#9,#10,#12,#13];
@@ -2322,7 +2381,8 @@ begin
       goto out;
     end;
 
-    v := str^;
+    { Read current char }
+    Move(buf^, v, char_size);
 
     case v of
     #10:
@@ -2512,15 +2572,29 @@ redo_char:
           TokRec^.current := TSuperObject.Create(SOString(tok.pb.GetString));
           TokRec^.saved_state := tsFinish;
           TokRec^.state := tsEatws;
-        end else
-        if (v = '\') then
+        end
+        else if (v = '\') then
         begin
           TokRec^.saved_state := tsString;
           TokRec^.state := tsStringEscape;
-        end else
-        begin
-          tok.pb.Append(@v, 1);
         end
+        else if char_size = 1 then
+          case StreamDecodeUtf8(tok.Utf8State, tok.Utf8CodePoint, Cardinal(v)) of
+            UTF8_ACCEPT:
+            begin
+              v := WideChar(tok.Utf8CodePoint);
+              tok.pb.Append(@v, 1);
+            end;
+            UTF8_REJECT:
+            begin
+              v := #$FFFD; { INVALID_CHAR }
+              tok.pb.Append(@v, 1);
+              tok.Utf8State := UTF8_ACCEPT;
+            end;
+          { else : continue parsing, maybe next byte will complete the current codepoint }
+          end
+        else { assume v is already a valid unicode char }
+          tok.pb.Append(@v, 1)
       end;
 
     tsEvalProperty:
@@ -3225,7 +3299,7 @@ redo_char:
         end
       end;
     end;
-    inc(str);
+    inc(buf, char_size);
     inc(tok.char_offset);
   until v = #0;
 
@@ -4867,6 +4941,9 @@ begin
   pb := TSuperWriterString.Create;
   line := 1;
   col := 0;
+  (* utf8 *)
+  Utf8State := UTF8_ACCEPT;
+  Utf8CodePoint := 0;
   Reset;
 end;
 
