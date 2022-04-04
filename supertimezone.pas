@@ -641,7 +641,7 @@ begin
 
     if (not islocal) then
     begin
-      Dec(llTime, (pTZinfo.StandardBias - pTZinfo.DaylightBias) * 600000000);
+      Dec(llTime, Int64(pTZinfo.StandardBias - pTZinfo.DaylightBias) * 600000000);
       PInt64(@ftTemp)^ := llTime;
       FileTimeToSystemTime(lpFileTime^, SysTime);
     end;
