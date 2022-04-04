@@ -608,7 +608,7 @@ begin
       Exit;
     end;
 
-    if (not IsLocal) then
+    if not IsLocal then
     begin
       llTime := PInt64(lpFileTime)^;
       Dec(llTime, Int64(pTZinfo^.Bias) * 600000000);
@@ -619,7 +619,7 @@ begin
     FileTimeToSystemTime(lpFileTime^, SysTime);
     year := SysTime.wYear;
 
-    if (not IsLocal) then
+    if not IsLocal then
     begin
       Dec(llTime, Int64(pTZinfo^.DaylightBias) * 600000000);
       PInt64(@ftTemp)^ := llTime;
@@ -627,7 +627,7 @@ begin
     end;
 
     (* check for daylight savings *)
-    if (year = SysTime.wYear) then
+    if year = SysTime.wYear then
     begin
       ret := DayLightCompareDate(@SysTime, @pTZinfo.StandardDate);
       if (ret = -2) then
@@ -636,17 +636,18 @@ begin
         Exit;
       end;
       beforeStandardDate := ret < 0;
-    end else
+    end
+    else
       beforeStandardDate := SysTime.wYear < year;
 
-    if (not islocal) then
+    if not IsLocal then
     begin
       Dec(llTime, Int64(pTZinfo.StandardBias - pTZinfo.DaylightBias) * 600000000);
       PInt64(@ftTemp)^ := llTime;
       FileTimeToSystemTime(lpFileTime^, SysTime);
     end;
 
-    if (year = SysTime.wYear) then
+    if year = SysTime.wYear then
     begin
       ret := DayLightCompareDate(@SysTime, @pTZinfo.DaylightDate);
       if (ret = -2) then
@@ -655,7 +656,8 @@ begin
         Exit;
       end;
       afterDaylightDate := ret >= 0;
-    end else
+    end
+    else
       afterDaylightDate := SysTime.wYear > year;
 
     Result := TIME_ZONE_ID_STANDARD;
