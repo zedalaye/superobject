@@ -776,7 +776,7 @@ var
   p: PSOChar;
   sep: TPerhaps;
   state: TState;
-  pos, v: Word;
+  pos, v, nms: Word;
   inctz: Boolean;
 label
   error;
@@ -793,6 +793,7 @@ begin
   bias := 0;
   havedate := True;
   havetz := False;
+  nms := 0; // number of ms digits
 
   while True do
     case state of
@@ -1291,7 +1292,12 @@ begin
         case p^ of
           '0' .. '9':
             begin
-              st.wMilliseconds := st.wMilliseconds * 10 + Ord(p^) - Ord('0');
+              if nms < 3 then
+              begin
+                st.wMilliseconds := st.wMilliseconds * 10 + Ord(p^) - Ord('0');
+                Inc(nms);
+              end;
+              // ignore nanoseconds
               Inc(p);
             end;
           '+':
