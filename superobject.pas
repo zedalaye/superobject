@@ -1041,22 +1041,44 @@ begin
 end;
 
 function TryObjectToDate(const obj: ISuperObject; var dt: TDateTime): Boolean;
+const
+  MS_IN_A_DAY = 86_400_000;
 var
   i: Int64;
+  Today: Int64;
+  TimeOnly: Boolean;
 begin
+  TimeOnly := False;
+  Today := 0;
+
   case ObjectGetType(obj) of
   stInt:
     begin
-      dt := JavaToDelphiDateTime(obj.AsInteger);
+      if obj.AsInteger < MS_IN_A_DAY then
+      begin
+        TimeOnly := True;
+        Today := DelphiToJavaDateTime(Date);
+      end;
+      dt := JavaToDelphiDateTime(obj.AsInteger + Today);
+      if TimeOnly then
+        dt := Frac(dt);
       Result := True;
     end;
   stString:
     begin
       if ISO8601DateToJavaDateTime(obj.AsString, i) then
       begin
-        dt := JavaToDelphiDateTime(i);
+        if i < MS_IN_A_DAY then
+        begin
+          TimeOnly := True;
+          Today := DelphiToJavaDateTime(Date);
+        end;
+        dt := JavaToDelphiDateTime(i + Today);
+        if TimeOnly then
+          dt := Frac(dt);
         Result := True;
-      end else
+      end
+      else
         Result := TryStrToDateTime(obj.AsString, dt);
     end;
   else
