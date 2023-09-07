@@ -822,6 +822,7 @@ function SA(const Args: array of const): ISuperObject; overload;
 
 function TryObjectToDate(const obj: ISuperObject; var dt: TDateTime): Boolean;
 function UUIDToString(const g: TGUID): SOString;
+function UUIDToRfc4122(const g: TGUID): SOString;
 function StringToUUID(const str: SOString; var g: TGUID): Boolean;
 
 {$IFDEF HAVE_RTTI}
@@ -1483,6 +1484,20 @@ begin
      g.D4[0], g.D4[1], g.D4[2],
      g.D4[3], g.D4[4], g.D4[5],
      g.D4[6], g.D4[7]]);
+end;
+
+{ Same as before with dashes to match the RFC4122 spec :
+  xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx }
+function UUIDToRfc4122(const g: TGUID): SOString;
+begin
+  Result := LowerCase(
+    Format('%.8x-%.4x-%.4x-%.2x%.2x-%.2x%.2x%.2x%.2x%.2x%.2x', [
+      g.D1, g.D2, g.D3,
+      g.D4[0], g.D4[1], g.D4[2],
+      g.D4[3], g.D4[4], g.D4[5],
+      g.D4[6], g.D4[7]
+    ])
+  );
 end;
 
 function StringToUUID(const str: SOString; var g: TGUID): Boolean;
