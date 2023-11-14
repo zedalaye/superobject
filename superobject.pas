@@ -2381,7 +2381,7 @@ const
   path = ['a'..'z', 'A'..'Z', '.', '_'];
 var
   obj: ISuperObject;
-  v: SOChar;
+  v, unicode_char: SOChar;
 {$IFDEF SUPER_METHOD}
   sm: TSuperMethod;
 {$ENDIF}
@@ -2409,6 +2409,7 @@ label
   out, redo_char;
 
 begin
+  unicode_char := #0;
   evalstack := 0;
   obj := nil;
   Result := nil;
@@ -2642,13 +2643,13 @@ redo_char:
           case StreamDecodeUtf8(tok.Utf8State, tok.Utf8CodePoint, Cardinal(v)) of
           UTF8_ACCEPT:
             begin
-              v := WideChar(tok.Utf8CodePoint);
-              tok.pb.Append(@v, 1);
+              unicode_char := WideChar(tok.Utf8CodePoint);
+              tok.pb.Append(@unicode_char, 1);
             end;
           UTF8_REJECT:
             begin
-              v := #$FFFD; { INVALID_CHAR }
-              tok.pb.Append(@v, 1);
+              unicode_char := #$FFFD; { INVALID_CHAR }
+              tok.pb.Append(@unicode_char, 1);
               tok.Utf8State := UTF8_ACCEPT;
             end;
           { else : continue parsing, maybe next byte will complete the current codepoint }
