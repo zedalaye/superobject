@@ -2358,21 +2358,27 @@ class function TSuperObject.ParseEx(tok: TSuperTokenizer;
   strict: Boolean; const this: ISuperObject; options: TSuperFindOptions;
   const put: ISuperObject; dt: TSuperType): ISuperObject;
 
+  function hexdigit(x: SOChar): byte; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+  begin
+    if x <= '9' then
+      Result := byte(x) - byte('0')
+    else
+      Result := (byte(x) and 7) + 9;
+  end;
+
+  function min(v1, v2: integer): integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+  begin
+    if v1 < v2 then
+      result := v1
+    else
+      result := v2
+  end;
+
 const
   spaces = [#32,#8,#9,#10,#12,#13];
   delimiters = ['"', '.', '[', ']', '{', '}', '(', ')', ',', ':', #0];
   reserved = delimiters + spaces;
   path = ['a'..'z', 'A'..'Z', '.', '_'];
-
-  function hexdigit(x: SOChar): byte; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
-  begin
-    if x <= '9' then
-      Result := byte(x) - byte('0') else
-      Result := (byte(x) and 7) + 9;
-  end;
-  function min(v1, v2: integer): integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
-  begin if v1 < v2 then result := v1 else result := v2 end;
-
 var
   obj: ISuperObject;
   v: SOChar;
@@ -2390,15 +2396,18 @@ var
   begin
     if tok.depth > 0 then
       case tok.stack[tok.depth - 1].state of
-        tsArrayAdd: Result := v in [',', ']', #0];
+        tsArrayAdd:       Result := v in [',', ']', #0];
         tsObjectValueAdd: Result := v in [',', '}', #0];
       else
         Result := v = #0;
-      end else
-        Result := v = #0;
+      end
+    else
+      Result := v = #0;
   end;
 
-label out, redo_char;
+label
+  out, redo_char;
+
 begin
   evalstack := 0;
   obj := nil;
@@ -2412,8 +2421,10 @@ begin
     if (tok.char_offset = len) then
     begin
       if (tok.depth = 0) and (TokRec^.state = tsEatws) and
-         (TokRec^.saved_state = tsFinish) then
-        tok.err := teSuccess else
+         (TokRec^.saved_state = tsFinish)
+      then
+        tok.err := teSuccess
+      else
         tok.err := teContinue;
       goto out;
     end;
@@ -2427,7 +2438,8 @@ begin
         inc(tok.line);
         tok.col := 0;
       end;
-    #9: inc(tok.col, 4);
+    #9:
+      inc(tok.col, 4);
     else
       inc(tok.col);
     end;
@@ -2436,13 +2448,16 @@ redo_char:
     case TokRec^.state of
     tsEatws:
       begin
-        if (SOIChar(v) < 256) and (AnsiChar(v) in spaces) then {nop} else
-        if (v = '/') then
+        if (SOIChar(v) < 256) and (AnsiChar(v) in spaces) then
+          {nop}
+        else if (v = '/') then
         begin
           tok.pb.Reset;
           tok.pb.Append(@v, 1);
           TokRec^.state := tsCommentStart;
-        end else begin
+        end
+        else
+        begin
           TokRec^.state := TokRec^.saved_state;
           goto redo_char;
         end
@@ -2457,6 +2472,7 @@ redo_char:
           tok.pb.Reset;
           tok.quote_char := v;
         end;
+
       '-':
         begin
           TokRec^.state := tsNumber;
@@ -2483,18 +2499,21 @@ redo_char:
           tok.floatcount := -1;
           goto redo_char;
         end;
+
       '{':
         begin
           TokRec^.state := tsEatws;
           TokRec^.saved_state := tsObjectFieldStart;
           TokRec^.current := TSuperObject.Create(stObject);
         end;
+
       '[':
         begin
           TokRec^.state := tsEatws;
           TokRec^.saved_state := tsArray;
           TokRec^.current := TSuperObject.Create(stArray);
         end;
+
 {$IFDEF SUPER_METHOD}
       '(':
         begin
@@ -2505,6 +2524,7 @@ redo_char:
           end;
         end;
 {$ENDIF}
+
       'N',
       'n':
         begin
@@ -2513,6 +2533,7 @@ redo_char:
           tok.st_pos := 0;
           goto redo_char;
         end;
+
       'T',
       't',
       'F',
@@ -2531,7 +2552,8 @@ redo_char:
 
     tsFinish:
       begin
-        if(tok.depth = 0) then goto out;
+        if(tok.depth = 0) then
+          goto out;
         obj := TokRec^.current;
         tok.ResetLevel(tok.depth);
         dec(tok.depth);
@@ -2546,14 +2568,16 @@ redo_char:
         begin
           if (tok.st_pos = 4) then
           if (((SOIChar(v) < 256) and (AnsiChar(v) in path)) or (SOIChar(v) >= 256)) then
-            TokRec^.state := tsIdentifier else
+            TokRec^.state := tsIdentifier
+          else
           begin
             TokRec^.current := TSuperObject.Create(stNull);
             TokRec^.saved_state := tsFinish;
             TokRec^.state := tsEatws;
             goto redo_char;
           end;
-        end else
+        end
+        else
         begin
           TokRec^.state := tsIdentifier;
           tok.pb.FBuf[tok.st_pos] := #0;
@@ -2566,13 +2590,10 @@ redo_char:
     tsCommentStart:
       begin
         if(v = '*') then
-        begin
-          TokRec^.state := tsComment;
-        end else
-        if (v = '/') then
-        begin
-          TokRec^.state := tsCommentEol;
-        end else
+          TokRec^.state := tsComment
+        else if (v = '/') then
+          TokRec^.state := tsCommentEol
+        else
         begin
           tok.err := teParseComment;
           goto out;
@@ -2590,7 +2611,8 @@ redo_char:
     tsCommentEol:
       begin
         if (v = #10) then
-          TokRec^.state := tsEatws else
+          TokRec^.state := tsEatws
+        else
           tok.pb.Append(@v, 1);
       end;
 
@@ -2598,7 +2620,8 @@ redo_char:
       begin
         tok.pb.Append(@v, 1);
         if (v = '/') then
-          TokRec^.state := tsEatws else
+          TokRec^.state := tsEatws
+        else
           TokRec^.state := tsComment;
       end;
 
@@ -2617,12 +2640,12 @@ redo_char:
         end
         else if char_size = 1 then
           case StreamDecodeUtf8(tok.Utf8State, tok.Utf8CodePoint, Cardinal(v)) of
-            UTF8_ACCEPT:
+          UTF8_ACCEPT:
             begin
               v := WideChar(tok.Utf8CodePoint);
               tok.pb.Append(@v, 1);
             end;
-            UTF8_REJECT:
+          UTF8_REJECT:
             begin
               v := #$FFFD; { INVALID_CHAR }
               tok.pb.Append(@v, 1);
@@ -2640,8 +2663,8 @@ redo_char:
         begin
           TokRec^.current := TSuperObject.Create(stObject);
           TokRec^.parent.AsObject.PutO(tok.pb.Fbuf, TokRec^.current)
-        end else
-        if not ObjectIsType(TokRec^.current, stObject) then
+        end
+        else if not ObjectIsType(TokRec^.current, stObject) then
         begin
           tok.err := teEvalObject;
           goto out;
@@ -2657,8 +2680,8 @@ redo_char:
         begin
           TokRec^.current := TSuperObject.Create(stArray);
           TokRec^.parent.AsObject.PutO(tok.pb.Fbuf, TokRec^.current)
-        end else
-        if not ObjectIsType(TokRec^.current, stArray) then
+        end
+        else if not ObjectIsType(TokRec^.current, stArray) then
         begin
           tok.err := teEvalArray;
           goto out;
@@ -2667,6 +2690,7 @@ redo_char:
         TokRec^.state := tsParamValue;
         goto redo_char;
       end;
+
 {$IFDEF SUPER_METHOD}
     tsEvalMethod:
       begin
@@ -2676,7 +2700,8 @@ redo_char:
           TokRec^.obj := TSuperObject.Create(stArray);
           TokRec^.state := tsMethodValue;
           goto redo_char;
-        end else
+        end
+        else
         begin
           tok.err := teEvalMethod;
           goto out;
@@ -2687,7 +2712,7 @@ redo_char:
       begin
         case v of
         ')':
-            TokRec^.state := tsIdentifier;
+          TokRec^.state := tsIdentifier;
         else
           if (tok.depth >= SUPER_TOKENER_MAX_DEPTH-1) then
           begin
@@ -2707,32 +2732,33 @@ redo_char:
       begin
         TokRec^.obj.AsArray.Add(obj);
         case v of
-          ',':
-            begin
-              tok.pb.Reset;
-              TokRec^.saved_state := tsMethodValue;
-              TokRec^.state := tsEatws;
-            end;
-          ')':
-            begin
-              if TokRec^.obj.AsArray.Length = 1 then
-                TokRec^.obj := TokRec^.obj.AsArray.GetO(0);
-              dec(evalstack);
-              tok.pb.Reset;
-              TokRec^.saved_state := tsIdentifier;
-              TokRec^.state := tsEatws;
-            end;
+        ',':
+          begin
+            tok.pb.Reset;
+            TokRec^.saved_state := tsMethodValue;
+            TokRec^.state := tsEatws;
+          end;
+        ')':
+          begin
+            if TokRec^.obj.AsArray.Length = 1 then
+              TokRec^.obj := TokRec^.obj.AsArray.GetO(0);
+            dec(evalstack);
+            tok.pb.Reset;
+            TokRec^.saved_state := tsIdentifier;
+            TokRec^.state := tsEatws;
+          end;
         else
           tok.err := teEvalMethod;
           goto out;
         end;
       end;
 {$ENDIF}
+
     tsParamValue:
       begin
         case v of
         ']':
-            TokRec^.state := tsIdentifier;
+          TokRec^.state := tsIdentifier;
         else
           if (tok.depth >= SUPER_TOKENER_MAX_DEPTH-1) then
           begin
@@ -2775,213 +2801,224 @@ redo_char:
               TokRec^.saved_state := tsFinish;
               TokRec^.state := tsEatws;
               goto redo_char;
-            end else
+            end
+            else
             begin
               tok.err := teParseString;
               goto out;
             end;
-          end else
-          if (v = '\') then
+          end
+          else if (v = '\') then
           begin
             TokRec^.saved_state := tsIdentifier;
             TokRec^.state := tsStringEscape;
-          end else
+          end
+          else
             tok.pb.Append(@v, 1);
-        end else
+        end
+        else
         begin
-         if (SOIChar(v) < 256) and (AnsiChar(v) in reserved) then
-         begin
-           TokRec^.gparent := TokRec^.parent;
-           if TokRec^.current = nil then
-             TokRec^.parent := this else
-             TokRec^.parent := TokRec^.current;
+          if (SOIChar(v) < 256) and (AnsiChar(v) in reserved) then
+          begin
+            TokRec^.gparent := TokRec^.parent;
+            if TokRec^.current = nil then
+              TokRec^.parent := this
+            else
+              TokRec^.parent := TokRec^.current;
 
-             case ObjectGetType(TokRec^.parent) of
-               stObject:
-                 case v of
-                   '.':
-                     begin
-                       TokRec^.state := tsEvalProperty;
-                       if tok.pb.FBPos > 0 then
-                         TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
-                     end;
-                   '[':
-                     begin
-                       TokRec^.state := tsEvalArray;
-                       if tok.pb.FBPos > 0 then
-                         TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
-                     end;
-                   '(':
-                     begin
-                       TokRec^.state := tsEvalMethod;
-                       if tok.pb.FBPos > 0 then
-                         TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
-                     end;
-                 else
-                   if tok.pb.FBPos > 0 then
+            case ObjectGetType(TokRec^.parent) of
+            stObject:
+              case v of
+              '.':
+                begin
+                  TokRec^.state := tsEvalProperty;
+                  if tok.pb.FBPos > 0 then
+                    TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
+                end;
+              '[':
+                begin
+                  TokRec^.state := tsEvalArray;
+                  if tok.pb.FBPos > 0 then
+                    TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
+                end;
+              '(':
+                begin
+                  TokRec^.state := tsEvalMethod;
+                  if tok.pb.FBPos > 0 then
                      TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
-                   if (foPutValue in options) and (evalstack = 0) then
-                   begin
-                     TokRec^.parent.AsObject.PutO(tok.pb.Fbuf, put);
-                     TokRec^.current := put
-                   end else
-                   if (foDelete in options) and (evalstack = 0) then
-                   begin
-                     TokRec^.current := TokRec^.parent.AsObject.Delete(tok.pb.Fbuf);
-                   end else
-                   if (TokRec^.current = nil) and (foCreatePath in options) then
-                   begin
-                     TokRec^.current := TSuperObject.Create(dt);
-                     TokRec^.parent.AsObject.PutO(tok.pb.Fbuf, TokRec^.current);
-                   end;
-                   if not (foDelete in options) then
-                     TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
-                   TokRec^.state := tsFinish;
-                   goto redo_char;
-                 end;
-               stArray:
-                 begin
-                   if TokRec^.obj <> nil then
-                   begin
-                     if not ObjectIsType(TokRec^.obj, stInt) or (TokRec^.obj.AsInteger < 0) then
-                     begin
-                       tok.err := teEvalInt;
-                       TokRec^.obj := nil;
-                       goto out;
-                     end;
-                     numi := TokRec^.obj.AsInteger;
-                     TokRec^.obj := nil;
+                end;
+              else
+                if tok.pb.FBPos > 0 then
+                  TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
+                if (foPutValue in options) and (evalstack = 0) then
+                begin
+                  TokRec^.parent.AsObject.PutO(tok.pb.Fbuf, put);
+                  TokRec^.current := put
+                end
+                else if (foDelete in options) and (evalstack = 0) then
+                begin
+                  TokRec^.current := TokRec^.parent.AsObject.Delete(tok.pb.Fbuf);
+                end
+                else if (TokRec^.current = nil) and (foCreatePath in options) then
+                begin
+                  TokRec^.current := TSuperObject.Create(dt);
+                  TokRec^.parent.AsObject.PutO(tok.pb.Fbuf, TokRec^.current);
+                end;
+                if not (foDelete in options) then
+                  TokRec^.current := TokRec^.parent.AsObject.GetO(tok.pb.Fbuf);
+                TokRec^.state := tsFinish;
+                goto redo_char;
+              end;
 
-                     TokRec^.current := TokRec^.parent.AsArray.GetO(numi);
-                     case v of
-                       '.':
-                         if (TokRec^.current = nil) and (foCreatePath in options) then
-                         begin
-                           TokRec^.current := TSuperObject.Create(stObject);
-                           TokRec^.parent.AsArray.PutO(numi, TokRec^.current);
-                         end else
-                         if (TokRec^.current = nil) then
-                         begin
-                           tok.err := teEvalObject;
-                           goto out;
-                         end;
-                       '[':
-                         begin
-                           if (TokRec^.current = nil) and (foCreatePath in options) then
-                           begin
-                             TokRec^.current := TSuperObject.Create(stArray);
-                             TokRec^.parent.AsArray.Add(TokRec^.current);
-                           end else
-                           if (TokRec^.current = nil) then
-                           begin
-                             tok.err := teEvalArray;
-                             goto out;
-                           end;
-                           TokRec^.state := tsEvalArray;
-                         end;
-                       '(': TokRec^.state := tsEvalMethod;
-                     else
-                       if (foPutValue in options) and (evalstack = 0) then
-                       begin
-                         TokRec^.parent.AsArray.PutO(numi, put);
-                         TokRec^.current := put;
-                       end else
-                       if (foDelete in options) and (evalstack = 0) then
-                       begin
-                         TokRec^.current := TokRec^.parent.AsArray.Delete(numi);
-                       end else
-                         TokRec^.current := TokRec^.parent.AsArray.GetO(numi);
-                       TokRec^.state := tsFinish;
-                       goto redo_char
-                     end;
-                   end else
-                   begin
-                     case v of
-                       '.':
-                         begin
-                           if (foPutValue in options) then
-                           begin
-                             TokRec^.current := TSuperObject.Create(stObject);
-                             TokRec^.parent.AsArray.Add(TokRec^.current);
-                           end else
-                             TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1);
-                         end;
-                       '[':
-                         begin
-                           if (foPutValue in options) then
-                           begin
-                             TokRec^.current := TSuperObject.Create(stArray);
-                             TokRec^.parent.AsArray.Add(TokRec^.current);
-                           end else
-                             TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1);
-                           TokRec^.state := tsEvalArray;
-                         end;
-                       '(':
-                         begin
-                           if not (foPutValue in options) then
-                             TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1) else
-                             TokRec^.current := nil;
+            stArray:
+              begin
+                if TokRec^.obj <> nil then
+                begin
+                  if not ObjectIsType(TokRec^.obj, stInt) or (TokRec^.obj.AsInteger < 0) then
+                  begin
+                    tok.err := teEvalInt;
+                    TokRec^.obj := nil;
+                    goto out;
+                  end;
+                  numi := TokRec^.obj.AsInteger;
+                  TokRec^.obj := nil;
+                  TokRec^.current := TokRec^.parent.AsArray.GetO(numi);
 
-                           TokRec^.state := tsEvalMethod;
-                         end;
-                     else
-                       if (foPutValue in options) and (evalstack = 0) then
-                       begin
-                         TokRec^.parent.AsArray.Add(put);
-                         TokRec^.current := put;
-                       end else
-                         if tok.pb.FBPos = 0 then
-                           TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1);
-                       TokRec^.state := tsFinish;
-                       goto redo_char
-                     end;
-                   end;
-                 end;
+                  case v of
+                  '.':
+                    if (TokRec^.current = nil) and (foCreatePath in options) then
+                    begin
+                      TokRec^.current := TSuperObject.Create(stObject);
+                      TokRec^.parent.AsArray.PutO(numi, TokRec^.current);
+                    end
+                    else if (TokRec^.current = nil) then
+                    begin
+                      tok.err := teEvalObject;
+                      goto out;
+                    end;
+                  '[':
+                    begin
+                      if (TokRec^.current = nil) and (foCreatePath in options) then
+                      begin
+                        TokRec^.current := TSuperObject.Create(stArray);
+                        TokRec^.parent.AsArray.Add(TokRec^.current);
+                      end
+                      else if (TokRec^.current = nil) then
+                      begin
+                        tok.err := teEvalArray;
+                        goto out;
+                      end;
+                      TokRec^.state := tsEvalArray;
+                    end;
+                  '(':
+                    TokRec^.state := tsEvalMethod;
+                  else
+                    if (foPutValue in options) and (evalstack = 0) then
+                    begin
+                      TokRec^.parent.AsArray.PutO(numi, put);
+                      TokRec^.current := put;
+                    end
+                    else if (foDelete in options) and (evalstack = 0) then
+                      TokRec^.current := TokRec^.parent.AsArray.Delete(numi)
+                    else
+                      TokRec^.current := TokRec^.parent.AsArray.GetO(numi);
+                    TokRec^.state := tsFinish;
+                    goto redo_char
+                  end;
+                end
+                else
+                begin
+                  case v of
+                  '.':
+                    begin
+                      if (foPutValue in options) then
+                      begin
+                        TokRec^.current := TSuperObject.Create(stObject);
+                        TokRec^.parent.AsArray.Add(TokRec^.current);
+                      end
+                      else
+                        TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1);
+                    end;
+                  '[':
+                    begin
+                      if (foPutValue in options) then
+                      begin
+                         TokRec^.current := TSuperObject.Create(stArray);
+                        TokRec^.parent.AsArray.Add(TokRec^.current);
+                      end
+                      else
+                        TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1);
+                      TokRec^.state := tsEvalArray;
+                    end;
+                  '(':
+                    begin
+                      if not (foPutValue in options) then
+                        TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1)
+                      else
+                        TokRec^.current := nil;
+                      TokRec^.state := tsEvalMethod;
+                    end;
+
+                  else
+                    if (foPutValue in options) and (evalstack = 0) then
+                    begin
+                      TokRec^.parent.AsArray.Add(put);
+                      TokRec^.current := put;
+                    end
+                    else if tok.pb.FBPos = 0 then
+                      TokRec^.current := TokRec^.parent.AsArray.GetO(TokRec^.parent.AsArray.FLength - 1);
+                    TokRec^.state := tsFinish;
+                    goto redo_char
+                  end;
+                end;
+              end;
+
 {$IFDEF SUPER_METHOD}
-               stMethod:
-                 case v of
-                   '.':
-                     begin
-                       TokRec^.current := nil;
-                       sm := TokRec^.parent.AsMethod;
-                       sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
-                       TokRec^.obj := nil;
-                     end;
-                   '[':
-                     begin
-                       TokRec^.current := nil;
-                       sm := TokRec^.parent.AsMethod;
-                       sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
-                       TokRec^.state := tsEvalArray;
-                       TokRec^.obj := nil;
-                     end;
-                   '(':
-                     begin
-                       TokRec^.current := nil;
-                       sm := TokRec^.parent.AsMethod;
-                       sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
-                       TokRec^.state := tsEvalMethod;
-                       TokRec^.obj := nil;
-                     end;
-                 else
-                   if not (foPutValue in options) or (evalstack > 0) then
-                   begin
-                     TokRec^.current := nil;
-                     sm := TokRec^.parent.AsMethod;
-                     sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
-                     TokRec^.obj := nil;
-                     TokRec^.state := tsFinish;
-                     goto redo_char
-                   end else
-                   begin
-                     tok.err := teEvalMethod;
-                     TokRec^.obj := nil;
-                     goto out;
-                   end;
-                 end;
-{$ENDIF}
-             end;
-          end else
+            stMethod:
+              case v of
+              '.':
+                begin
+                  TokRec^.current := nil;
+                  sm := TokRec^.parent.AsMethod;
+                  sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
+                  TokRec^.obj := nil;
+                end;
+              '[':
+                begin
+                  TokRec^.current := nil;
+                  sm := TokRec^.parent.AsMethod;
+                  sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
+                  TokRec^.state := tsEvalArray;
+                  TokRec^.obj := nil;
+                end;
+              '(':
+                begin
+                  TokRec^.current := nil;
+                  sm := TokRec^.parent.AsMethod;
+                  sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
+                  TokRec^.state := tsEvalMethod;
+                  TokRec^.obj := nil;
+                end;
+              else
+                if not (foPutValue in options) or (evalstack > 0) then
+                begin
+                  TokRec^.current := nil;
+                  sm := TokRec^.parent.AsMethod;
+                  sm(TokRec^.gparent, TokRec^.obj, TokRec^.current);
+                  TokRec^.obj := nil;
+                  TokRec^.state := tsFinish;
+                  goto redo_char
+                end
+                else
+                begin
+                  tok.err := teEvalMethod;
+                  TokRec^.obj := nil;
+                  goto out;
+                end;
+              end;
+{$ENDIF}    end;
+          end
+          else
             tok.pb.Append(@v, 1);
         end;
       end;
@@ -2994,11 +3031,11 @@ redo_char:
       't',
       'f':
         begin
-          if(v = 'b') then tok.pb.Append(TOK_BS, 1)
-          else if(v = 'n') then tok.pb.Append(TOK_LF, 1)
-          else if(v = 'r') then tok.pb.Append(TOK_CR, 1)
-          else if(v = 't') then tok.pb.Append(TOK_TAB, 1)
-          else if(v = 'f') then tok.pb.Append(TOK_FF, 1);
+               if (v = 'b') then tok.pb.Append(TOK_BS, 1)
+          else if (v = 'n') then tok.pb.Append(TOK_LF, 1)
+          else if (v = 'r') then tok.pb.Append(TOK_CR, 1)
+          else if (v = 't') then tok.pb.Append(TOK_TAB, 1)
+          else if (v = 'f') then tok.pb.Append(TOK_FF, 1);
           TokRec^.state := TokRec^.saved_state;
         end;
       'u':
@@ -3029,12 +3066,14 @@ redo_char:
             tok.pb.Append(@tok.ucs_char, 1);
             TokRec^.state := TokRec^.saved_state;
           end
-        end else
+        end
+        else
         begin
           tok.err := teParseString;
           goto out;
         end
       end;
+
     tsEscapeHexadecimal:
       begin
         if ((SOIChar(v) < 256) and (AnsiChar(v) in super_hex_chars_set)) then
@@ -3046,39 +3085,44 @@ redo_char:
             tok.pb.Append(@tok.ucs_char, 1);
             TokRec^.state := TokRec^.saved_state;
           end
-        end else
+        end
+        else
         begin
           tok.err := teParseString;
           goto out;
         end
       end;
+
     tsBoolean:
       begin
         tok.pb.Append(@v, 1);
         if (StrLComp('true', PSOChar(tok.pb.FBuf), min(tok.st_pos + 1, 4)) = 0) then
         begin
           if (tok.st_pos = 4) then
-          if (((SOIChar(v) < 256) and (AnsiChar(v) in path)) or (SOIChar(v) >= 256)) then
-            TokRec^.state := tsIdentifier else
-          begin
-            TokRec^.current := TSuperObject.Create(true);
-            TokRec^.saved_state := tsFinish;
-            TokRec^.state := tsEatws;
-            goto redo_char;
-          end
-        end else
-        if (StrLComp('false', PSOChar(tok.pb.FBuf), min(tok.st_pos + 1, 5)) = 0) then
+            if (((SOIChar(v) < 256) and (AnsiChar(v) in path)) or (SOIChar(v) >= 256)) then
+              TokRec^.state := tsIdentifier
+            else
+            begin
+              TokRec^.current := TSuperObject.Create(true);
+              TokRec^.saved_state := tsFinish;
+              TokRec^.state := tsEatws;
+              goto redo_char;
+            end
+        end
+        else if (StrLComp('false', PSOChar(tok.pb.FBuf), min(tok.st_pos + 1, 5)) = 0) then
         begin
           if (tok.st_pos = 5) then
           if (((SOIChar(v) < 256) and (AnsiChar(v) in path)) or (SOIChar(v) >= 256)) then
-            TokRec^.state := tsIdentifier else
+            TokRec^.state := tsIdentifier
+          else
           begin
             TokRec^.current := TSuperObject.Create(false);
             TokRec^.saved_state := tsFinish;
             TokRec^.state := tsEatws;
             goto redo_char;
           end
-        end else
+        end
+        else
         begin
           TokRec^.state := tsIdentifier;
           tok.pb.FBuf[tok.st_pos] := #0;
@@ -3095,10 +3139,11 @@ redo_char:
           tok.pb.Append(@v, 1);
           if (SOIChar(v) < 256) then
           case v of
-          '.': begin
-                 tok.is_double := 1;
-                 tok.floatcount := 0;
-               end;
+          '.':
+            begin
+              tok.is_double := 1;
+              tok.floatcount := 0;
+            end;
           'e','E':
             begin
               tok.is_double := 1;
@@ -3106,7 +3151,6 @@ redo_char:
             end;
           '0'..'9':
             begin
-
               if (tok.is_double = 1) and (tok.floatcount >= 0) then
               begin
                 inc(tok.floatcount);
@@ -3115,7 +3159,8 @@ redo_char:
               end;
             end;
           end;
-        end else
+        end
+        else
         begin
           if (tok.is_double = 0) then
           begin
@@ -3127,16 +3172,18 @@ redo_char:
                 begin
                   this.AsArray.PutO(numi, put);
                   TokRec^.current := put;
-                end else
-                if (foDelete in options) and (evalstack = 0) then
-                  TokRec^.current := this.AsArray.Delete(numi) else
+                end
+                else if (foDelete in options) and (evalstack = 0) then
+                  TokRec^.current := this.AsArray.Delete(numi)
+                else
                   TokRec^.current := this.AsArray.GetO(numi);
-              end else
+              end
+              else
                 TokRec^.current := TSuperObject.Create(numi)
             else
               TokRec^.current := TSuperObject.Create(tok.pb.FBuf);
-          end else
-          if (tok.is_double <> 0) then
+          end
+          else if (tok.is_double <> 0) then
           begin
             if tok.floatcount >= 0 then
             begin
@@ -3150,13 +3197,14 @@ redo_char:
               p^ := #0;
               val(tok.pb.FBuf, numi, code);
               case tok.floatcount of
-                0: numi := numi * 10000;
-                1: numi := numi * 1000;
-                2: numi := numi * 100;
-                3: numi := numi * 10;
+              0: numi := numi * 10000;
+              1: numi := numi * 1000;
+              2: numi := numi * 100;
+              3: numi := numi * 10;
               end;
               TokRec^.current := TSuperObject.CreateCurrency(PCurrency(@numi)^);
-            end else
+            end
+            else
             begin
               val(tok.pb.FBuf, numd, code);
               if code = 0 then
@@ -3164,7 +3212,8 @@ redo_char:
               else
                 TokRec^.current := TSuperObject.Create(tok.pb.FBuf);
             end;
-          end else
+          end
+          else
           begin
             tok.err := teParseNumber;
             goto out;
@@ -3181,7 +3230,8 @@ redo_char:
         begin
           TokRec^.saved_state := tsFinish;
           TokRec^.state := tsEatws;
-        end else
+        end
+        else
         begin
           if(tok.depth >= SUPER_TOKENER_MAX_DEPTH-1) then
           begin
@@ -3210,12 +3260,13 @@ redo_char:
         begin
           TokRec^.saved_state := tsFinish;
           TokRec^.state := tsEatws;
-        end else
-        if (v = ',') then
+        end
+        else if (v = ',') then
         begin
           TokRec^.saved_state := tsArray;
           TokRec^.state := tsEatws;
-        end else
+        end
+        else
         begin
           tok.err := teParseArray;
           goto out;
@@ -3228,19 +3279,20 @@ redo_char:
         begin
           TokRec^.saved_state := tsFinish;
           TokRec^.state := tsEatws;
-        end else
-        if (SOIChar(v) < 256) and (AnsiChar(v) in ['"', '''']) then
+        end
+        else if (SOIChar(v) < 256) and (AnsiChar(v) in ['"', '''']) then
         begin
           tok.quote_char := v;
           tok.pb.Reset;
           TokRec^.state := tsObjectField;
-        end else
-        if not((SOIChar(v) < 256) and ((AnsiChar(v) in reserved) or strict)) then
+        end
+        else if not((SOIChar(v) < 256) and ((AnsiChar(v) in reserved) or strict)) then
         begin
           TokRec^.state := tsObjectUnquotedField;
           tok.pb.Reset;
           goto redo_char;
-        end else
+        end
+        else
         begin
           tok.err := teParseObjectKeyName;
           goto out;
@@ -3254,15 +3306,14 @@ redo_char:
           TokRec^.field_name := tok.pb.FBuf;
           TokRec^.saved_state := tsObjectFieldEnd;
           TokRec^.state := tsEatws;
-        end else
-        if (v = '\') then
+        end
+        else if (v = '\') then
         begin
           TokRec^.saved_state := tsObjectField;
           TokRec^.state := tsStringEscape;
-        end else
-        begin
-          tok.pb.Append(@v, 1);
         end
+        else
+          tok.pb.Append(@v, 1);
       end;
 
     tsObjectUnquotedField:
@@ -3273,12 +3324,13 @@ redo_char:
           TokRec^.saved_state := tsObjectFieldEnd;
           TokRec^.state := tsEatws;
           goto redo_char;
-        end else
-        if (v = '\') then
+        end
+        else if (v = '\') then
         begin
           TokRec^.saved_state := tsObjectUnquotedField;
           TokRec^.state := tsStringEscape;
-        end else
+        end
+        else
           tok.pb.Append(@v, 1);
       end;
 
@@ -3288,7 +3340,8 @@ redo_char:
         begin
           TokRec^.saved_state := tsObjectValue;
           TokRec^.state := tsEatws;
-        end else
+        end
+        else
         begin
           tok.err := teParseObjectKeySep;
           goto out;
@@ -3324,24 +3377,25 @@ redo_char:
         begin
           TokRec^.saved_state := tsFinish;
           TokRec^.state := tsEatws;
-        end else
-        if (v = ',') then
+        end
+        else if (v = ',') then
         begin
           TokRec^.saved_state := tsObjectFieldStart;
           TokRec^.state := tsEatws;
-        end else
+        end
+        else
         begin
           tok.err := teParseObjectValueSep;
           goto out;
         end
       end;
     end;
+
     inc(buf, char_size);
     inc(tok.char_offset);
   until v = #0;
 
-  if(TokRec^.state <> tsFinish) and
-     (TokRec^.saved_state <> tsFinish) then
+  if (TokRec^.state <> tsFinish) and (TokRec^.saved_state <> tsFinish) then
     tok.err := teParseEof;
 
  out:
@@ -3352,10 +3406,12 @@ redo_char:
     begin
       sm := TokRec^.current.AsMethod;
       sm(TokRec^.parent, put, Result);
-    end else
+    end
+    else
 {$ENDIF}
-    Result := TokRec^.current;
-  end else
+      Result := TokRec^.current;
+  end
+  else
     Result := nil;
 end;
 
