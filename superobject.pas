@@ -840,20 +840,20 @@ function SOInvoke(const obj: TValue; const method: string; const params: ISuperO
 function SOInvoke(const obj: TValue; const method: string; const params: string; ctx: TSuperRttiContext = nil): ISuperObject; overload;
 {$ENDIF}
 
-implementation
-uses
-  sysutils, Windows, superdate
-{$IFDEF FPC}
-  ,sockets
-{$ELSE}
-  ,WinSock
+const
+  SUPER_TYPE_NAMES: array[TSuperType] of string = (
+    'null',
+    'boolean',
+    'double',
+    'currency',
+    'int',
+    'object',
+    'array',
+    'string'
+{$IFDEF SUPER_METHOD}
+    ,'method'
 {$ENDIF}
-  ;
-
-{$IFDEF DEBUG}
-var
-  debugcount: integer = 0;
-{$ENDIF}
+  );
 
 (* Inline Utf8 Decoder *)
 
@@ -885,6 +885,23 @@ const
     12,12,12,12,12,12,12,36,12,36,12,12, 12,36,12,12,12,12,12,36,12,36,12,12,
     12,36,12,12,12,12,12,12,12,12,12,12
   );
+
+function StreamDecodeUtf8(var State: Cardinal; var CodePoint: UCS4Char; Byte: Cardinal): Cardinal; inline;
+
+implementation
+uses
+  sysutils, Windows, superdate
+{$IFDEF FPC}
+  ,sockets
+{$ELSE}
+  ,WinSock
+{$ENDIF}
+  ;
+
+{$IFDEF DEBUG}
+var
+  debugcount: integer = 0;
+{$ENDIF}
 
 function StreamDecodeUtf8(var State: Cardinal; var CodePoint: UCS4Char; Byte: Cardinal): Cardinal; inline;
 var
