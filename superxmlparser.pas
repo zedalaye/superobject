@@ -1301,99 +1301,69 @@ begin
   FStack := st;
 end;
 
-function utf8toucs2(src: PAnsiChar; srclen: Integer; dst: PWideChar; unused: PInteger): Integer;
+function Utf8ToUtf16(aBuffer: PAnsiChar; aLen: Integer;
+  wBuffer: PSOChar; wLen: Integer; var LastUsed: Integer): Integer;
 var
-  ch: Byte;
-  ret: Word;
-  min: Cardinal;
-  rem, com: integer;
-label
-  redo;
+  aIndex, wIndex: Integer;
+  Utf8State, Codepoint: Cardinal;
 begin
-  Result := 0;
+  aIndex := 0; wIndex := 0; LastUsed := -1;
+  Utf8State := UTF8_ACCEPT; CodePoint := 0;
 
-  if unused <> nil then
-    unused^ := 0;
-
-  if(src = nil) or (srclen = 0) then
+  while (aIndex < aLen) and (wIndex < wLen) do
   begin
-    dst^ := #0;
-    Exit;
-  end;
-
-  while srclen > 0 do
-  begin
-    ch := Byte(src^);
-    inc(src);
-    dec(srclen);
-
-redo:
-    if (ch and $80) = 0 then
-    begin
-      dst^ := WideChar(ch);
-      inc(Result);
-    end else
-    begin
-        if((ch and $E0) = $C0) then
+    case StreamDecodeUtf8(Utf8State, CodePoint, Cardinal(aBuffer[aIndex])) of
+    UTF8_ACCEPT:
+      begin
+        if CodePoint > $ffff then
         begin
-          min := $80;
-          rem := 1;
-          ret := ch and $1F;
-        end else
-        if((ch and $F0) = $E0) then
+          { This codepoint must be re-encoded to utf-16 if there is
+            enough free space in wBuffer }
+          if (wIndex +1) < wLen then
+          begin
+            wBuffer[wIndex] := SOChar($d7c0 + (CodePoint shr 10));
+            Inc(wIndex);
+            wBuffer[wIndex] := SOChar($dc00 + (CodePoint and $3ff));
+            Inc(wIndex);
+            LastUsed := aIndex;
+          end
+          else
+            Break; { wBuffer is too small }
+        end
+        else
         begin
-          min := $800;
-          rem := 2;
-          ret := ch and $0F;
-        end else
-          // too large utf8 bloc
-          // ignore and continue
-          continue;
-
-        com := rem;
-        while(rem <> 0) do
-        begin
-          dec(rem);
-          if(srclen = 0) then
-          begin
-            if unused <> nil then
-              unused^ := com;
-            Exit;
-          end;
-          ch := Byte(src^);
-          inc(src);
-          dec(srclen);
-          if((ch and $C0) = $80) then
-          begin
-            ret := ret shl 6;
-            ret := ret or (ch and $3F);
-          end else
-          begin
-            // unterminated utf8 bloc :/
-            // try next one
-            goto redo;
-          end;
+          wbuffer[wIndex] := SOChar(CodePoint);
+          Inc(wIndex);
+          LastUsed := aIndex;
         end;
+        CodePoint := 0;
+      end;
 
-        if (ret >= min) then
-        begin
-          dst^ := WideChar(ret);
-          inc(Result);
-        end else
-          // too small utf8 bloc
-          // ignore and continue
-          Continue;
+    UTF8_REJECT:
+      begin
+        wBuffer[wIndex] := #$FFFD; { INVALID_CHAR }
+        Inc(wIndex);
+        LastUsed := aIndex;
+        Utf8State := UTF8_ACCEPT;
+        CodePoint := 0;
+      end;
+    { else : continue parsing, maybe next byte will complete the
+             current codepoint }
     end;
-    inc(dst);
+
+    Inc(aIndex);
   end;
+
+  Result := wIndex;
 end;
 
 function XMLParseStream(stream: TStream; pack: Boolean; onpi: TOnProcessingInstruction): ISuperObject;
 const
+  BUFFER_SIZE = 1023;
   CP_UTF8 = 65001;
 var
-  wbuffer: array[0..1023] of SOChar;
-  abuffer: array[0..1023] of AnsiChar;
+  wbuffer: array[0..BUFFER_SIZE] of SOChar;
+  abuffer: array[0..BUFFER_SIZE] of AnsiChar;
   len, read, cursor: Integer;
   PI, PIParent: ISuperObject;
   bom: array[0..2] of byte;
@@ -1403,25 +1373,25 @@ var
   cp: Integer;
   ecp: ISuperObject;
 
-  function getbuffer: Integer;
+  function GetBuffer: Integer;
   var
-    size, unusued: Integer;
+    size, LastUsed: Integer;
   begin
     case encoding of
 {$IFNDEF UNIX}
       xnANSI:
         begin
-          size := stream.Read(abuffer, sizeof(abuffer));
-          result := MultiByteToWideChar(cp, 0, @abuffer, size, @wbuffer, sizeof(wbuffer));
+          size := stream.Read(aBuffer, SizeOf(aBuffer));
+          Result := MultiByteToWideChar(cp, 0, @aBuffer, size, @wBuffer, SizeOf(wBuffer));
         end;
 {$ENDIF}
 
       xnUTF8:
         begin
-          size := stream.Read(abuffer, sizeof(abuffer));
-          result := utf8toucs2(@abuffer, size, @wbuffer, @unusued);
-          if unusued > 0 then
-            stream.Seek(-unusued, soFromCurrent);
+          size := stream.Read(aBuffer, SizeOf(aBuffer));
+          Result := Utf8ToUtf16(aBuffer, size, wbuffer, Length(wBuffer), LastUsed);
+          if LastUsed < (size -1) then
+            stream.Seek(-(size-1-LastUsed), soFromCurrent);
         end;
 
       xnUnicode:
