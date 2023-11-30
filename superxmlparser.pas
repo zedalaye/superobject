@@ -303,19 +303,21 @@ const
       if FStack^.obj.AsObject.count = 2 then // name + children
       begin
         if FStack^.prev <> nil then
-          AddProperty(FStack^.prev^.obj, anobject.AsArray[0], FStack^.obj.AsObject.S[xmlname]) else
-          begin
-            AddProperty(FStack^.obj, anobject.AsArray[0], xmltext);
-            FStack^.obj.AsObject.Delete(xmlchildren);
-          end;
+          AddProperty(FStack^.prev^.obj, anobject.AsArray[0], FStack^.obj.AsObject.S[xmlname])
+        else
+        begin
+          AddProperty(FStack^.obj, anobject.AsArray[0], xmltext);
+          FStack^.obj.AsObject.Delete(xmlchildren);
+        end;
       end
       else
       begin
         AddProperty(FStack^.obj, anobject.AsArray[0], FStack^.obj.AsObject.S[xmlname]);
         FStack^.obj.AsObject.Delete(xmlchildren);
         if FStack^.prev <> nil then
-          AddProperty(FStack^.prev^.obj, FStack^.obj, FStack^.obj.AsObject.S[xmlname]) else
-        FStack^.obj.AsObject.Delete(xmlchildren);
+          AddProperty(FStack^.prev^.obj, FStack^.obj, FStack^.obj.AsObject.S[xmlname])
+        else
+          FStack^.obj.AsObject.Delete(xmlchildren);
         FStack^.obj.AsObject.Delete(xmlname);
       end;
     end else
@@ -329,7 +331,8 @@ const
           begin
             AddProperty(FStack^.obj, anobject2, anobject2.AsObject.S[xmlname]);
             anobject2.AsObject.Delete(xmlname);
-          end else
+          end
+          else
             AddProperty(FStack^.obj, anobject2, xmltext);
         end;
         FStack^.obj.Delete(xmlchildren);
@@ -337,7 +340,8 @@ const
       if (FStack^.prev <> nil) and (FStack^.obj.AsObject.count > 1) then
       begin
         if (FStack^.obj.AsObject.count = 2) and (FStack^.obj.AsObject[xmltext] <> nil) then
-          AddProperty(FStack^.prev^.obj, FStack^.obj.AsObject[xmltext], FStack^.obj.AsObject.S[xmlname]) else
+          AddProperty(FStack^.prev^.obj, FStack^.obj.AsObject[xmltext], FStack^.obj.AsObject.S[xmlname])
+        else
           AddProperty(FStack^.prev^.obj, FStack^.obj, FStack^.obj.AsObject.S[xmlname]);
       end;
       FStack^.obj.Delete(xmlname);
@@ -354,6 +358,7 @@ label
 begin
   p := data;
   read := 0;
+
   //Result := 0;
   repeat
 
@@ -369,23 +374,28 @@ begin
       Result := read;
       exit;
     end;
+
     c := p^;
+
   redo:
     case FStack^.state of
 
       xsEatSpaces:
-        if {$IFDEF UNICODE}(c < #256) and {$ENDIF} (AnsiChar(c) in spaces) then {nop} else
+        if {$IFDEF UNICODE}(c < #256) and {$ENDIF} (AnsiChar(c) in spaces) then
+          {nop}
+        else
         begin
           FStack^.state := FStack^.savedstate;
           goto redo;
         end;
 
       xsStart:
-          case c of
-            '<': FStack^.state := xsElement;
-          else
-            goto err;
-          end;
+        case c of
+          '<': FStack^.state := xsElement;
+        else
+          goto err;
+        end;
+
       xsElement:
         begin
           case c of
@@ -411,27 +421,32 @@ begin
               FStack^.state := xsElementName;
               FStack^.clazz := xcElement;
               goto redo;
-            end else
+            end
+            else
               goto err;
           end;
         end;
+
       xsElementPI:
         begin
           if ((c < #256) and (AnsiChar(c) in alphanums)) or (c >= #256) then
-            FStr.Append(@c, 1) else
+            FStr.Append(@c, 1)
+          else
+          begin
+            FStack^.obj := TSuperObject.Create(stObject);
+            FStack^.obj.AsObject.S[xmlname] := FStr.Data;
+            FStack^.state := xsEatSpaces;
+            if FStr.Data = 'xml' then
+              FStack^.savedstate := xsAttributes
+            else
             begin
-              FStack^.obj := TSuperObject.Create(stObject);
-              FStack^.obj.AsObject.S[xmlname] := FStr.Data;
-              FStack^.state := xsEatSpaces;
-              if FStr.Data = 'xml' then
-                FStack^.savedstate := xsAttributes else
-                begin
-                  FValue.Reset;
-                  FStack^.savedstate := xsElementDataPI;
-                end;
-              goto redo;
+              FValue.Reset;
+              FStack^.savedstate := xsElementDataPI;
             end;
+            goto redo;
+          end;
         end;
+
       xsElementDataPI:
         begin
           case c of
@@ -444,9 +459,11 @@ begin
             FValue.Append(@c, 1);
           end;
         end;
+
       xsCloseElementPI:
         begin
-          if (c <> '>') then goto err;
+          if (c <> '>') then
+            goto err;
           PI := FStack^.obj;
           StackDown;
           PIParent := FStack^.obj;
@@ -454,18 +471,21 @@ begin
           Result := read + 1;
           Exit;
         end;
+
       xsElementName:
         begin
           if ((c < #256) and (AnsiChar(c) in alphanums)) or (c >= #256) then
-            FStr.Append(@c, 1) else
-            begin
-              FStack^.obj := TSuperObject.Create(stObject);
-              FStack^.obj.AsObject.S[xmlname] := FStr.Data;
-              FStack^.state := xsEatSpaces;
-              FStack^.savedstate := xsAttributes;
-              goto redo;
-            end;
+            FStr.Append(@c, 1)
+          else
+          begin
+            FStack^.obj := TSuperObject.Create(stObject);
+            FStack^.obj.AsObject.S[xmlname] := FStr.Data;
+            FStack^.state := xsEatSpaces;
+            FStack^.savedstate := xsAttributes;
+            goto redo;
+          end;
         end;
+
       xsChildren:
         begin
           case c of
@@ -477,6 +497,7 @@ begin
             goto redo;
           end;
         end;
+
       xsCloseEmptyElement:
         begin
           case c of
@@ -489,6 +510,7 @@ begin
             goto err;
           end;
         end;
+
       xsTryCloseElement:
         begin
           case c of
@@ -520,10 +542,12 @@ begin
               FStack^.state := xsElementName;
               FStack^.clazz := xcElement;
               goto redo;
-            end else
+            end
+            else
               goto err;
           end;
         end;
+
       xsCloseElementName:
         begin
           if FStr.Position = FPosition then
@@ -531,17 +555,21 @@ begin
             FStack^.savedstate := xsCloseEmptyElement;
             FStack^.state := xsEatSpaces;
             goto redo;
-          end else
+          end
+          else
           begin
-            if (c <> FStr.Data[FPosition]) then goto err;
+            if (c <> FStr.Data[FPosition]) then
+              goto err;
             inc(FPosition);
           end;
         end;
+
       xsAttributes:
         begin
           case c of
             '?': begin
-                  if FStack^.clazz <> xcProcessInst then goto err;
+                  if FStack^.clazz <> xcProcessInst then
+                    goto err;
                   FStack^.state := xsCloseElementPI;
                  end;
             '/': begin
@@ -557,10 +585,12 @@ begin
               FStr.Reset;
               FStr.Append(@c, 1);
               FStack^.state := xsAttributeName;
-            end else
+            end
+            else
               goto err;
           end;
         end;
+
       xsAttributeName:
         begin
           if ((c < #256) and (AnsiChar(c) in alphanums)) or (c >= #256) then
@@ -571,7 +601,8 @@ begin
             begin
               if FStack^.obj.AsObject[FStr.Data] <> nil then
                 goto err;
-            end else
+            end
+            else
             begin
               anobject := FStack^.obj.AsObject[xmlattributes];
               if (anobject <> nil) and (anobject.AsObject[FStr.Data] <> nil) then
@@ -582,65 +613,72 @@ begin
             goto redo;
           end;
         end;
+
       xsEqual:
         begin
-          if c <> '=' then goto err;
+          if c <> '=' then
+            goto err;
           FStack^.state := xsEatSpaces;
           FStack^.savedstate := xsAttributeValue;
           FValue.Reset;
           FPosition := 0;
           FAChar := #0;
         end;
+
       xsAttributeValue:
         begin
           if FAChar <> #0 then
           begin
             if (c = FAChar) then
+            begin
+              if FPack then
               begin
-                if FPack then
+                FStack^.obj.AsObject[FStr.Data] := TSuperObject.Create(Fvalue.Data);
+              end
+              else
+              begin
+                anobject := FStack^.obj.AsObject[xmlattributes];
+                if anobject = nil then
                 begin
-                  FStack^.obj.AsObject[FStr.Data] := TSuperObject.Create(Fvalue.Data);
-                end else
-                begin
-                  anobject := FStack^.obj.AsObject[xmlattributes];
-                  if anobject = nil then
-                  begin
-                    anobject := TSuperObject.Create(stObject);
-                    FStack^.obj.AsObject[xmlattributes] := anobject;
-                  end;
-                  anobject.AsObject[FStr.Data] := TSuperObject.Create(Fvalue.Data);
+                  anobject := TSuperObject.Create(stObject);
+                  FStack^.obj.AsObject[xmlattributes] := anobject;
                 end;
-                FStack^.savedstate := xsAttributes;
-                FStack^.state := xsEatSpaces;
-              end else
-            case c of
-              '&':
-                begin
-                  FStack^.state := xsEscape;
-                  FStack^.savedstate := xsAttributeValue;
-                end;
-              #13, #10:
-                begin
-                  FValue.TrimRight;
-                  FValue.Append(XML_SPACE, 1);
-                  FStack^.state := xsEatSpaces;
-                  FStack^.savedstate := xsAttributeValue;
-                end;
+                anobject.AsObject[FStr.Data] := TSuperObject.Create(Fvalue.Data);
+              end;
+              FStack^.savedstate := xsAttributes;
+              FStack^.state := xsEatSpaces;
+            end
             else
-              FValue.Append(@c, 1);
-            end;
+              case c of
+                '&':
+                  begin
+                    FStack^.state := xsEscape;
+                    FStack^.savedstate := xsAttributeValue;
+                  end;
+                #13, #10:
+                  begin
+                    FValue.TrimRight;
+                    FValue.Append(XML_SPACE, 1);
+                    FStack^.state := xsEatSpaces;
+                    FStack^.savedstate := xsAttributeValue;
+                  end;
+              else
+                FValue.Append(@c, 1);
+              end;
 
-          end else
+          end
+          else
           begin
             if (c < #256) and (AnsiChar(c) in ['"', '''']) then
             begin
               FAChar := c;
               inc(FPosition);
-
-            end else
+            end
+            else
               goto err;
           end;
         end;
+
       xsElementString:
         begin
           case c of
@@ -665,6 +703,7 @@ begin
             FValue.Append(@c, 1);
           end;
         end;
+
       xsElementComment:
         begin
           case FPosition of
@@ -686,7 +725,8 @@ begin
                        FStack^.state := xsElementDocType;
                        FPosition := 0;
                        FStack^.clazz := xcDocType;
-                     end else
+                     end
+                     else
                        goto err;
                    end;
                 else
@@ -695,7 +735,8 @@ begin
               end;
             1:
               begin
-                if c <> '-' then goto err;
+                if c <> '-' then
+                  goto err;
                 Inc(FPosition);
               end;
           else
@@ -706,6 +747,7 @@ begin
             end;
           end;
         end;
+
       xsCloseElementComment:
         begin
           case FPosition of
@@ -714,18 +756,22 @@ begin
                begin
                  FPosition := 2;
                  FStack^.state := xsElementComment;
-               end else
+               end
+               else
                  Inc(FPosition);
              end;
           1: begin
-               if c <> '>' then goto err;
+               if c <> '>' then
+                 goto err;
                FStack^.state := xsEatSpaces;
                if FStack^.obj <> nil then
-                  FStack^.savedstate := xsChildren else
+                  FStack^.savedstate := xsChildren
+               else
                   FStack^.savedstate := xsStart;
              end;
           end;
         end;
+
       xsElementCDATA:
         begin
           case FPosition of
@@ -746,17 +792,19 @@ begin
             end;
           end;
         end;
+
       xsClodeElementCDATA:
         begin
           case FPosition of
             0: if (c = ']') then
-                 inc(FPosition) else
-                 begin
-                   FValue.Append(XML_ARR, 1);
-                   FValue.Append(@c, 1);
-                   FPosition := 6;
-                   FStack^.state := xsElementCDATA;
-                 end;
+                 inc(FPosition)
+               else
+               begin
+                 FValue.Append(XML_ARR, 1);
+                 FValue.Append(@c, 1);
+                 FPosition := 6;
+                 FStack^.state := xsElementCDATA;
+               end;
             1: case c of
                '>':
                  begin
@@ -774,6 +822,7 @@ begin
             end;
           end;
         end;
+
       xsElementDocType:
         begin
           case FPosition of
@@ -789,10 +838,12 @@ begin
               FStack^.state := xsEatSpaces;
               FStack^.savedstate := xsElementDocTypeName;
               FStr.Reset;
-            end else
+            end
+            else
               goto err;
           end;
         end;
+
       xsElementDocTypeName:
         begin
           case FStr.Position of
@@ -806,23 +857,26 @@ begin
                      end
                  else
                    if ((c < #256) and (AnsiChar(c) in alphas)) or (c > #256) then
-                     FStr.Append(@c, 1) else
+                     FStr.Append(@c, 1)
+                   else
                      goto err;
                  end;
                end;
           else
             if ((c < #256) and (AnsiChar(c) in alphanums)) or (c > #256) then
-              FStr.Append(@c, 1) else
-              if (c < #256) and (AnsiChar(c) in spaces) then
-              begin
-                FDocType := TSuperObject.Create(stObject);
-                FDocType.AsObject.S[xmlname] := FStr.Data;
-                FStack^.state := xsEatSpaces;
-                FStack^.savedstate := xsElementDocTypeExternId;
-              end else
-                goto err;
+              FStr.Append(@c, 1)
+            else if (c < #256) and (AnsiChar(c) in spaces) then
+            begin
+              FDocType := TSuperObject.Create(stObject);
+              FDocType.AsObject.S[xmlname] := FStr.Data;
+              FStack^.state := xsEatSpaces;
+              FStack^.savedstate := xsElementDocTypeExternId;
+            end
+            else
+              goto err;
           end;
         end;
+
       xsElementDocTypeExternId:
         begin
           case c of
@@ -850,6 +904,7 @@ begin
             goto err;
           end;
         end;
+
       xsElementDocTypeExternIdPublic:
         begin
           case FPosition of
@@ -865,7 +920,8 @@ begin
               FPosition := 0;
               FStack^.savedstate := xsElementDocTypePubIdLiteral;
               FStack^.state := xsEatSpaces;
-            end else
+            end
+            else
               goto err;
           end;
         end;
@@ -885,10 +941,12 @@ begin
               FPosition := 0;
               FStack^.savedstate := xsElementDocTypeSystemLiteral;
               FStack^.state := xsEatSpaces;
-            end else
+            end
+            else
               goto err;
           end;
         end;
+
       xsElementDocTypePubIdLiteral:
         begin
           if FPosition = 0 then
@@ -900,18 +958,19 @@ begin
                 end
             else
               goto err;
-            end else
-            if c = FAChar then
+            end
+            else if c = FAChar then
             begin
               FDocType.AsObject.S[dtdPubidLiteral] := FStr.Data;
               FStr.Reset;
               FPosition := 0;
               FStack^.state := xsEatSpaces;
               FStack^.savedstate := xsElementDocTypeSystemLiteral;
-            end else
-              if (c < #256) and (AnsiChar(c) in publitteral) then
-                FStr.Append(@c, 1);
+            end
+            else if (c < #256) and (AnsiChar(c) in publitteral) then
+              FStr.Append(@c, 1);
         end;
+
       xsElementDocTypeSystemLiteral:
         begin
           if FPosition = 0 then
@@ -923,14 +982,15 @@ begin
                 end
             else
               goto err;
-            end else
-            if c = FAChar then
-            begin
-              FDocType.AsObject.S[dtdSystemLiteral] := FStr.Data;
-              FStack^.state := xsEatSpaces;
-              FStack^.savedstate := xsElementDocTypeTryIntSubset;
-            end else
-              FStr.Append(@c, 1);
+            end
+          else if c = FAChar then
+          begin
+            FDocType.AsObject.S[dtdSystemLiteral] := FStr.Data;
+            FStack^.state := xsEatSpaces;
+            FStack^.savedstate := xsElementDocTypeTryIntSubset;
+          end
+          else
+            FStr.Append(@c, 1);
         end;
 
       xsElementDocTypeTryIntSubset:
@@ -949,6 +1009,7 @@ begin
             end;
           end;
         end;
+
       xsElementDocTypeIntSubset:
         begin
           case c of
@@ -959,6 +1020,7 @@ begin
               end;
           end;
         end;
+
       xsElementDocTypeTryClose:
         begin
           if c = '>' then
@@ -966,9 +1028,11 @@ begin
             FStack^.state := xsEatSpaces;
             FStack^.savedstate := xsStart;
             FStack^.clazz := xcNone;
-          end else
+          end
+          else
             goto err;
         end;
+
       xsEscape:
         begin
           FPosition := 0;
@@ -982,6 +1046,7 @@ begin
             goto err;
           end;
         end;
+
       xsEscape_lt:
         begin
           case FPosition of
@@ -996,6 +1061,7 @@ begin
                end;
           end;
         end;
+
       xsEscape_gt:
         begin
           case FPosition of
@@ -1010,6 +1076,7 @@ begin
                end;
           end;
         end;
+
       xsEscape_amp:
         begin
           case FPosition of
@@ -1035,6 +1102,7 @@ begin
                end;
           end;
         end;
+
       xsEscape_apos:
         begin
           case FPosition of
@@ -1064,6 +1132,7 @@ begin
                end;
           end;
         end;
+
       xsEscape_quot:
         begin
           case FPosition of
@@ -1086,9 +1155,12 @@ begin
                end;
           end;
         end;
+
       xsEscape_char:
         begin
-          if (SOIChar(c) >= 256) then goto err;
+          if (SOIChar(c) >= 256) then
+            goto err;
+
           case AnsiChar(c) of
             '0'..'9':
               begin
@@ -1103,9 +1175,12 @@ begin
             goto err;
           end;
         end;
+
       xsEscape_char_num:
         begin
-          if (SOIChar(c) >= 256) then goto err;
+          if (SOIChar(c) >= 256) then
+            goto err;
+
           case AnsiChar(c) of
             '0'..'9':FPosition := (FPosition * 10) + (SOIChar(c) - 48);
             ';': begin
@@ -1116,27 +1191,35 @@ begin
             goto err;
           end;
         end;
+
       xsEscape_char_hex:
         begin
-          if (c >= #256) then goto err;
+          if (c >= #256) then
+            goto err;
+
           if (AnsiChar(c) in hex) then
           begin
             FPosition := (FPosition * 16) + SOIChar(hexdigit(c));
-          end else
-          if c = ';' then
+          end
+          else if c = ';' then
           begin
             FValue.Append(@FPosition, 1);
             FStack^.state := FStack^.savedstate;
-          end else
+          end
+          else
             goto err;
         end;
+
       xsEnd:
         begin
-          if(FStack^.prev = nil) then Break;
+          if(FStack^.prev = nil) then
+            Break;
+
           if FStack^.obj <> nil then
           begin
             if FPack then
-            packend else
+              packend
+            else
             begin
               anobject := FStack^.prev^.obj.AsObject[xmlchildren];
               if anobject = nil then
@@ -1160,10 +1243,13 @@ begin
     if FPack then
       packend;
     FError := xeSuccess;
-  end else
+  end
+  else
     FError := xeError;
+
   Result := read;
-  exit;
+  Exit;
+
 err:
   FError := xeError;
   Result := read;
@@ -1321,7 +1407,6 @@ var
   var
     size, unusued: Integer;
   begin
-
     case encoding of
 {$IFNDEF UNIX}
       xnANSI:
@@ -1330,6 +1415,7 @@ var
           result := MultiByteToWideChar(cp, 0, @abuffer, size, @wbuffer, sizeof(wbuffer));
         end;
 {$ENDIF}
+
       xnUTF8:
         begin
           size := stream.Read(abuffer, sizeof(abuffer));
@@ -1337,11 +1423,14 @@ var
           if unusued > 0 then
             stream.Seek(-unusued, soFromCurrent);
         end;
-      xnUnicode: Result := stream.Read(wbuffer, sizeof(wbuffer)) div sizeof(SOChar);
+
+      xnUnicode:
+        Result := stream.Read(wBuffer, SizeOf(wBuffer)) div SizeOf(SOChar);
     else
       Result := 0;
     end;
   end;
+
 label
   redo, retry;
 begin
@@ -1370,12 +1459,13 @@ begin
   begin
     encoding := xnUnicode;
     stream.Seek(2, soFromBeginning);
-  end else
-  if (len = 3) and (bom[0] = $EF) and (bom[1] = $BB) and (bom[2] = $BF) then
+  end
+  else if (len = 3) and (bom[0] = $EF) and (bom[1] = $BB) and (bom[2] = $BF) then
   begin
     encoding := xnUTF8;
     cp := CP_UTF8;
-  end else
+  end
+  else
   begin
     encoding := xnUTF8;
     cp := 0;
@@ -1390,6 +1480,7 @@ begin
 retry:
       read := ParseBuffer(@wbuffer, PI, PIParent, len);
       cursor := 0;
+
 redo:
       case FError of
         xeContinue: len := getbuffer;
@@ -1399,43 +1490,47 @@ redo:
             if (PIParent = nil) and (PI.AsObject.S[xmlname] = 'xml') then
             begin
               if pack then
-                encodingstr := LowerCase(trim(PI.S['encoding'])) else
+                encodingstr := LowerCase(trim(PI.S['encoding']))
+              else
                 encodingstr := LowerCase(trim(PI.S[xmlattributes + '.encoding']));
+
               if (encodingstr <> '') then
-              case encoding of
-                xnUTF8: if(cp = CP_UTF8) then
-                        begin
-                          if (encodingstr <> 'utf-8') then
-                          begin
-                            FError := xeError;
-                            Break;
-                          end;
-                        end else
-                        begin
-                          cp := ecp.I[encodingstr];
-                          if cp > 0 then
-                          begin
+                case encoding of
+                  xnUTF8:
+                    if(cp = CP_UTF8) then
+                    begin
+                      if (encodingstr <> 'utf-8') then
+                      begin
+                        FError := xeError;
+                        Break;
+                      end;
+                    end
+                    else
+                    begin
+                      cp := ecp.I[encodingstr];
+                      if cp > 0 then
+                      begin
 {$IFNDEF UNIX}
-                            encoding := xnANSI;
-                            Reset;
-                            stream.Seek(0, soFromBeginning);
-                            len := getbuffer;
-                            goto retry;
+                        encoding := xnANSI;
+                        Reset;
+                        stream.Seek(0, soFromBeginning);
+                        len := getbuffer;
+                        goto retry;
 {$ELSE}
-                            raise Exception.Create('charset not implemented');
+                        raise Exception.Create('charset not implemented');
 {$ENDIF}
-                          end;
-                        end;
-                xnUnicode:
-                        if (encodingstr <> 'utf-16') and (encodingstr <> 'unicode') then
-                        begin
-                          FError := xeError;
-                          Break;
-                        end;
-              end;
-            end else
-              if Assigned(onpi) then
-                onpi(PI, PIParent);
+                      end;
+                    end;
+                  xnUnicode:
+                    if (encodingstr <> 'utf-16') and (encodingstr <> 'unicode') then
+                    begin
+                      FError := xeError;
+                      Break;
+                    end;
+                end;
+            end
+            else if Assigned(onpi) then
+              onpi(PI, PIParent);
 
             inc(cursor, read);
             if cursor >= len then
@@ -1443,13 +1538,16 @@ redo:
               len := getbuffer;
               continue;
             end;
+
             read := ParseBuffer(@wbuffer[cursor], PI, PIParent, len - cursor);
             goto redo;
           end;
       end;
     end;
+
     if FError = xeSuccess then
-      Result := FStack^.obj else
+      Result := FStack^.obj
+    else
       Result := nil;
   finally
     Free;
