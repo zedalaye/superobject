@@ -2660,8 +2660,18 @@ redo_char:
           case StreamDecodeUtf8(tok.Utf8State, tok.Utf8CodePoint, Cardinal(v)) of
           UTF8_ACCEPT:
             begin
-              unicode_char := WideChar(tok.Utf8CodePoint);
-              tok.pb.Append(@unicode_char, 1);
+              if tok.Utf8CodePoint > $ffff then
+              begin
+                unicode_char := WideChar($d7c0 + (tok.Utf8CodePoint shr 10));
+                tok.pb.Append(@unicode_char, 1);
+                unicode_char := WideChar($dc00 + (tok.Utf8CodePoint and $3ff));
+                tok.pb.Append(@unicode_char, 1);
+              end
+              else
+              begin
+                unicode_char := WideChar(tok.Utf8CodePoint);
+                tok.pb.Append(@unicode_char, 1);
+              end;
             end;
           UTF8_REJECT:
             begin
