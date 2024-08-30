@@ -91,7 +91,8 @@
 {$if defined(VER230) or defined(VER240) or defined(VER250) or
      defined(VER260) or defined(VER270) or defined(VER280) or
      defined(VER290) or defined(VER310) or defined(VER320) or
-     defined(VER330) or defined(VER340) or defined(VER350)}
+     defined(VER330) or defined(VER340) or defined(VER350) or
+     defined(VER360)}
   {$define VER210ORGREATER}
   {$define VER230ORGREATER}
 {$ifend}
@@ -2233,7 +2234,7 @@ begin
     stString: Result := FOString;
     stNull: Result := '';
   else
-    Result := AsJSon(false, false);
+    Result := AsJson(false, false);
   end;
 end;
 
@@ -6388,7 +6389,7 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
 
   procedure FromDynArray;
   var
-    i: Integer;
+    i: NativeInt;
     p: Pointer;
     pb: PByte;
     val: TValue;
@@ -6463,7 +6464,6 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
 
     function ProcessDim(dim: Byte; const o: ISuperobject): Boolean;
     var
-      i: Integer;
       v: TValue;
       a: PTypeData;
     begin
@@ -6478,7 +6478,7 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
         end;
         Result := True;
         if dim = ArrayData.DimCount then
-          for i := a.MinValue to a.MaxValue do
+          for var i := a.MinValue to a.MaxValue do
           begin
             Result := FromJson(ArrayData.ElType^, o.AsArray[i], v);
             if not Result then
@@ -6490,7 +6490,7 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
             inc(idx);
           end
         else
-          for i := a.MinValue to a.MaxValue do
+          for var i := a.MinValue to a.MaxValue do
           begin
             Result := ProcessDim(dim + 1, o.AsArray[i]);
             if not Result then
@@ -6508,7 +6508,6 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
     end;
 
   var
-    i: Integer;
     v: TValue;
   begin
     TValue.Make(nil, TypeInfo, Value);
@@ -6519,7 +6518,7 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
       if ObjectIsType(obj, stArray) and (obj.AsArray.Length = ArrayData.ElCount) then
       begin
         Result := True;
-        for i := 0 to ArrayData.ElCount - 1 do
+        for var i := 0 to ArrayData.ElCount - 1 do
         begin
           Result := FromJson(ArrayData.ElType^, obj.AsArray[i], v);
           if not Result then
