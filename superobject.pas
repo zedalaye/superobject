@@ -447,7 +447,7 @@ type
   public
     str: PSOChar;
     pb: TSuperWriterString;
-    depth, is_double, floatcount, st_pos, char_offset: Integer;
+    depth, is_double, floatcount, st_pos, char_offset: LongInt;
     err:  TSuperTokenizerError;
     ucs_char: Word;
     quote_char: SOChar;
@@ -686,7 +686,7 @@ type
        const put: ISuperObject = nil; dt: TSuperType = stNull): ISuperObject;
     class function ParseFile(const FileName: string; strict: Boolean; partial: boolean = true; const this: ISuperObject = nil; options: TSuperFindOptions = [];
        const put: ISuperObject = nil; dt: TSuperType = stNull): ISuperObject;
-    class function ParseEx(tok: TSuperTokenizer; buf: PByte; len: integer; char_size: Byte; strict: Boolean; const this: ISuperObject = nil;
+    class function ParseEx(tok: TSuperTokenizer; buf: PByte; len: LongInt; char_size: Byte; strict: Boolean; const this: ISuperObject = nil;
       options: TSuperFindOptions = []; const put: ISuperObject = nil; dt: TSuperType = stNull): ISuperObject;
 
     // constructors / destructor
@@ -2310,9 +2310,9 @@ var
   tok: TSuperTokenizer;
   buffera: array[0..BUFFER_SIZE-1] of AnsiChar;
   bufferw: array[0..BUFFER_SIZE-1] of SOChar;
-  bom: array[0..1] of byte;
-  unicode: boolean;
-  size: Integer;
+  bom: array[0..1] of Byte;
+  unicode: Boolean;
+  size: LongInt;
   st: string;
 begin
   st := '';
@@ -2372,11 +2372,11 @@ begin
 end;
 
 class function TSuperObject.ParseEx(tok: TSuperTokenizer;
-  buf: PByte; len: integer; char_size: Byte;
+  buf: PByte; len: LongInt; char_size: Byte;
   strict: Boolean; const this: ISuperObject; options: TSuperFindOptions;
   const put: ISuperObject; dt: TSuperType): ISuperObject;
 
-  function hexdigit(x: SOChar): byte; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
+  function hexdigit(x: SOChar): Byte; {$IFDEF HAVE_INLINE} inline;{$ENDIF}
   begin
     if x <= '9' then
       Result := byte(x) - byte('0')
@@ -2384,7 +2384,7 @@ class function TSuperObject.ParseEx(tok: TSuperTokenizer;
       Result := (byte(x) and 7) + 9;
   end;
 
-  function min(v1, v2: integer): integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
+  function min(v1, v2: Integer): Integer;{$IFDEF HAVE_INLINE} inline;{$ENDIF}
   begin
     if v1 < v2 then
       result := v1
