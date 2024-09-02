@@ -2449,6 +2449,7 @@ begin
     end;
 
     { Read current char }
+    v := #0;
     Move(buf^, v, char_size);
 
     case v of
