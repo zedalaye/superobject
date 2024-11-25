@@ -1919,7 +1919,7 @@ type
           buf[3] := super_hex_chars[TByteChar(c).b and $f];
           buf[4] := super_hex_chars[TByteChar(c).a shr 4];
           buf[5] := super_hex_chars[TByteChar(c).a and $f];
-          Append(@buf, 6);
+          Append(PSOChar(@buf), 6);
           inc(pos);
           start_offset := pos;
         end else
@@ -2333,9 +2333,9 @@ begin
     while size > 0 do
     begin
       if unicode then
-        ParseEx(tok, @bufferw[0], size, SizeOf(SOChar), strict, this, options, put, dt)
+        ParseEx(tok, PByte(@bufferw[0]), size, SizeOf(SOChar), strict, this, options, put, dt)
       else
-        ParseEx(tok, @buffera[0], size, SizeOf(AnsiChar), strict, this, options, put, dt);
+        ParseEx(tok, PByte(@buffera[0]), size, SizeOf(AnsiChar), strict, this, options, put, dt);
 
       if tok.err = teContinue then
       begin
@@ -3093,7 +3093,7 @@ redo_char:
           inc(tok.st_pos);
           if (tok.st_pos = 4) then
           begin
-            tok.pb.Append(@tok.ucs_char, 1);
+            tok.pb.Append(PSOChar(@tok.ucs_char), 1);
             TokRec^.state := TokRec^.saved_state;
           end
         end
@@ -3112,7 +3112,7 @@ redo_char:
           inc(tok.st_pos);
           if (tok.st_pos = 2) then
           begin
-            tok.pb.Append(@tok.ucs_char, 1);
+            tok.pb.Append(PSOChar(@tok.ucs_char), 1);
             TokRec^.state := TokRec^.saved_state;
           end
         end
@@ -4962,13 +4962,13 @@ begin
   begin
     if Size > SizeOf(Buffer) then
       GetMem(pBuffer, Size) else
-      pBuffer := @Buffer;
+      pBuffer := PAnsiChar(@Buffer);
     try
       for i :=  0 to Size - 1 do
         pBuffer[i] := AnsiChar(buf[i]);
       Result := FStream.Write(pBuffer^, Size);
     finally
-      if pBuffer <> @Buffer then
+      if pBuffer <> PAnsiChar(@Buffer) then
         FreeMem(pBuffer);
     end;
   end;
@@ -5023,7 +5023,7 @@ begin
   begin
     if Size > SizeOf(Buffer) then
       GetMem(pBuffer, Size) else
-      pBuffer := @Buffer;
+      pBuffer := PAnsiChar(@Buffer);
     try
       for i :=  0 to Size - 1 do
         pBuffer[i] := AnsiChar(buf[i]);
@@ -5033,7 +5033,7 @@ begin
       Result := send(FSocket, pBuffer^, size, 0);
 {$ENDIF}
     finally
-      if pBuffer <> @Buffer then
+      if pBuffer <> PAnsiChar(@Buffer) then
         FreeMem(pBuffer);
     end;
   end;
@@ -6470,7 +6470,7 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
     begin
       if ObjectIsType(o, stArray) and (ArrayData.Dims[dim-1] <> nil) then
       begin
-        a := @GetTypeData(ArrayData.Dims[dim-1]^).ArrayData;
+        a := PTYpeData(@GetTypeData(ArrayData.Dims[dim-1]^).ArrayData);
         if (a.MaxValue - a.MinValue + 1) <> o.AsArray.Length then
         begin
           Error('Array (bad dimension)', obj);

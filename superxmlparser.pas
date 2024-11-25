@@ -1184,7 +1184,7 @@ begin
           case AnsiChar(c) of
             '0'..'9':FPosition := (FPosition * 10) + (SOIChar(c) - 48);
             ';': begin
-                   FValue.Append(@FPosition, 1);
+                   FValue.Append(PSOChar(@FPosition), 1);
                    FStack^.state := FStack^.savedstate;
                  end;
           else
@@ -1203,7 +1203,7 @@ begin
           end
           else if c = ';' then
           begin
-            FValue.Append(@FPosition, 1);
+            FValue.Append(PSOChar(@FPosition), 1);
             FStack^.state := FStack^.savedstate;
           end
           else
@@ -1382,7 +1382,7 @@ var
       xnANSI:
         begin
           size := stream.Read(aBuffer, SizeOf(aBuffer));
-          Result := MultiByteToWideChar(cp, 0, @aBuffer, size, @wBuffer, SizeOf(wBuffer));
+          Result := MultiByteToWideChar(cp, 0, LPCSTR(@aBuffer), size, LPWSTR(@wBuffer), SizeOf(wBuffer));
         end;
 {$ENDIF}
 
@@ -1448,7 +1448,7 @@ begin
     while len > 0 do
     begin
 retry:
-      read := ParseBuffer(@wbuffer, PI, PIParent, len);
+      read := ParseBuffer(PSOChar(@wbuffer), PI, PIParent, len);
       cursor := 0;
 
 redo:
