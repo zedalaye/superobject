@@ -6296,7 +6296,7 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
     case ObjectGetType(obj) of
     stObject, stArray:
       Error('String (from object or array)', obj);
-    stnull:
+    stNull:
       begin
         Value := '';
         Result := True;
@@ -6616,6 +6616,11 @@ function TSuperRttiContext.FromJson(TypeInfo: PTypeInfo; const obj: ISuperObject
     else
       Error('Interface', obj);
   end;
+
+  procedure FromVariant;
+  begin
+    Error('Variant', obj);
+  end;
 var
   Serial: TSerialFromJson;
 begin
@@ -6623,25 +6628,27 @@ begin
   begin
     if not SerialFromJson.TryGetValue(TypeInfo, Serial) then
       case TypeInfo.Kind of
-        tkChar:      FromChar;
-        tkInt64:     FromInt64;
-        tkEnumeration,
-        tkInteger:   FromInt(obj);
-        tkSet:       FromSet;
-        tkFloat:     FromFloat(obj);
-        tkString,
+        tkInteger:     FromInt(obj);
+        tkChar:        FromChar;
+        tkEnumeration: FromSet;
+        tkFloat:       FromFloat(obj);
+        tkString:      FromString;
+        tkSet:         FromSet;
+        tkClass:       FromClass;
+        tkMethod:      ;
+        tkWChar:       FromWideChar;
         tkLString,
-        tkUString,
-        tkWString:   FromString;
-        tkClass:     FromClass;
-        tkMethod: ;
-        tkWChar:     FromWideChar;
-        tkRecord:    FromRecord;
-        tkPointer: ;
-        tkInterface: FromInterface;
-        tkArray:     FromArray;
-        tkDynArray:  FromDynArray;
-        tkClassRef:  FromClassRef;
+        tkWString:     FromString;
+        tkVariant:     FromVariant;
+        tkArray:       FromArray;
+        tkRecord:      FromRecord;
+        tkInterface:   FromInterface;
+        tkInt64:       FromInt64;
+        tkDynArray:    FromDynArray;
+        tkUString:     FromString;
+        tkClassRef:    FromClassRef;
+        tkPointer:     ;
+        tkProcedure:   ;
       else
         FromUnknown
       end
